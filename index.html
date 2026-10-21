@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>支票整理工具</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#E8EBDE">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #F7F5F0;
+    color: #2C3D2E;
+  }
+  .app { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 66px; }
+  header { background: #2C3D2E; color: #F5F1E6; padding: 14px 18px; }
+  header h1 { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+  header p { font-size: 12px; margin: 0; color: #C9D6C4; }
+
+  .tabs {
+    display: flex; border-top: 1px solid #DDD8CB; background: #FDFCF9;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+  }
+  .tab-btn {
+    flex: 1; background: transparent; border: none; border-radius: 0;
+    padding: 20px 8px; font-size: 15px; font-weight: 600; color: #7A7462;
+    border-bottom: 3px solid transparent; cursor: pointer; min-height: 64px;
+  }
+  .tab-btn.active { color: #2C3D2E; border-bottom-color: #C89B3C; }
+
+  .panel { display: none; padding: 14px; }
+  .panel.active { display: block; }
+
+  .hint { font-size: 12px; color: #7A7462; line-height: 1.5; }
+  .field-label { font-size: 11px; color: #7A7462; font-weight: 600; }
+
+  input[type="text"], input[type="number"], input[type="tel"], select {
+    padding: 9px 10px; border: 1px solid #C9C3B2; border-radius: 6px;
+    font-size: 14px; background: #fff; font-family: inherit; width: 100%;
+  }
+  button { border: none; border-radius: 6px; padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .btn-primary { background: #C89B3C; color: #2C1E05; }
+  .btn-secondary { background: #E9E4D6; color: #2C3D2E; }
+  .btn-danger-text { background: transparent; color: #A34A3A; padding: 4px 8px; font-size: 12px; }
+  .search-row { display: flex; gap: 6px; }
+
+  /* ---- 登錄頁：左右兩欄各自捲動 ---- */
+  .split-layout { display: flex; gap: 12px; align-items: flex-start; }
+  @media (max-width: 720px) {
+    .split-layout { flex-direction: column; }
+  }
+  .split-col { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .col-title { font-size: 14px; font-weight: 700; color: #2C3D2E; }
+  .scroll-box {
+    max-height: 560px; overflow-y: auto; border: 1px solid #E4DFD1; border-radius: 8px;
+    background: #fff;
+  }
+  .entry-scroll-box {
+    height: 460px; min-height: 160px; max-height: 80vh;
+    overflow-y: auto; resize: vertical; border: 1px solid #E4DFD1; border-radius: 8px;
+    background: #fff;
+  }
+
+  /* 輸入區表格 */
+  .entry-table { width: 100%; border-collapse: collapse; }
+  .entry-table th {
+    position: sticky; top: 0; background: #EFEAD9; font-size: 12px; color: #2C3D2E;
+    padding: 8px 6px; text-align: left; border-bottom: 1px solid #DDD8CB; z-index: 1;
+  }
+  .entry-table td { padding: 4px; border-bottom: 1px solid #F0EDE2; }
+  .entry-table td.row-num { font-size: 12px; color: #9A9483; text-align: center; width: 56px; padding-left: 6px; white-space: nowrap; }
+  .match-dot { margin-left: 4px; }
+  .match-dot .yes, .match-dot .no {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; color: #fff;
+    font-size: 12px; font-weight: 700; vertical-align: middle; line-height: 1;
+  }
+  .match-dot .yes { background: #2C7A4B; }
+  .match-dot .no { background: #D32F2F; }
+  .entry-table input { border: 1px solid #DAD4C4; border-radius: 5px; padding: 8px 8px; font-size: 14px; }
+  .entry-table .del-row-btn { background: transparent; color: #B9412F; font-size: 16px; padding: 4px 6px; border: none; cursor: pointer; }
+
+  /* 統計整理區：可點擊消失的固定尺寸方框，無論有無登錄姓名/電話都一樣大 */
+  .summary-list { list-style: none; margin: 0; padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-content: flex-start; }
+  .summary-card {
+    width: calc(100% - 2cm); min-height: 2cm; box-sizing: border-box;
+    background: #fff; border: 1px solid #E4DFD1; border-radius: 8px;
+    padding: 8px 10px; cursor: pointer; user-select: none;
+    display: flex; flex-direction: column; justify-content: center; gap: 3px;
+    flex-shrink: 0;
+  }
+  .summary-card:active { background: #F3F0E6; }
+  .summary-card.unmatched { background: #FDF6E8; }
+  .summary-card .card-row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; line-height: 1.2; }
+  .summary-card .card-name { font-size: 14px; font-weight: 700; color: #2C3D2E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .summary-card .card-account { font-size: 15px; color: #9A9483; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; }
+  .summary-card .card-row2 { display: flex; justify-content: space-between; align-items: baseline; line-height: 1.2; }
+  .summary-card .amt { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; color: #8A6A1E; white-space: nowrap; }
+  .summary-card .count-badge { font-size: 15px; color: #2C3D2E; background: #EFEAD9; border-radius: 4px; padding: 1px 6px; font-weight: 700; flex-shrink: 0; white-space: nowrap; }
+  .summary-card .card-row3 { display: flex; flex-wrap: wrap; gap: 4px 12px; line-height: 1.2; }
+  .summary-card .tag-unmatched { font-size: 10px; color: #A3752C; background: #F2E2B8; border-radius: 3px; padding: 1px 5px; white-space: nowrap; }
+  .summary-card .phone-link { color: #2C5F4A; text-decoration: none; font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .summary-foot { display: flex; justify-content: space-between; align-items:center; font-size: 13px; padding: 10px 10px; background: #F3F0E6; border-bottom: 1px solid #DDD8CB; }
+  .summary-foot b { font-size: 15px; }
+  .restore-link { background: transparent; border: none; color: #2C5F4A; font-size: 12px; font-weight: 700; padding: 4px 6px; cursor: pointer; text-decoration: underline; }
+
+  .actions-row { display: flex; gap: 8px; }
+  .actions-row button { flex: 1; }
+
+  /* ---- 資料庫頁 ---- */
+  .db-item { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #E4DFD1; border-radius: 6px; padding: 10px 9px; }
+  .db-info { flex: 1; min-width: 0; }
+  .db-info .db-name { font-size: 14px; font-weight: 600; }
+  .db-info .db-note { font-size: 11px; color: #7A7462; }
+  .db-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .empty-state { font-size: 12px; color: #9A9483; text-align: center; padding: 14px 0; }
+  .form-box { background: #fff; border: 1px solid #E4DFD1; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .error-msg { font-size: 12px; color: #A34A3A; display: none; }
+  .error-msg.show { display: block; }
+  .confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; padding: 16px; }
+  .confirm-box { background: #FDFCF9; border-radius: 12px; padding: 18px; max-width: 340px; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+  .confirm-msg { font-size: 15px; color: #2C3D2E; line-height: 1.5; }
+  .confirm-actions { display: flex; gap: 10px; }
+  .confirm-actions button { flex: 1; padding: 14px; font-size: 15px; }
+  .btn-red { background: #EA0000; color: #fff; }
+
+  /* ===== 風格：淡鼠尾草底、細黑線外框、大圓角、等寬感字體 ===== */
+  :root { --bg:#E8EBDE; --ink:#1E1F1B; --mute:#8D9083; --line:#2A2B26; --soft:#DDE1D0; }
+  body { font-family: "Space Grotesk", "Space Mono", ui-monospace, "SF Mono", Menlo, "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); color: var(--ink); letter-spacing: .01em; }
+  header { background: transparent; color: var(--ink); padding: 26px 22px 10px; }
+  header h1 { font-size: 30px; font-weight: 500; letter-spacing: -.01em; margin: 0 0 6px; }
+  header p { color: var(--mute); font-size: 12px; }
+  .tabs { background: var(--bg); border-top: 1px solid var(--line); box-shadow: none; gap: 10px; padding: 8px 12px 10px; }
+  .tab-btn { border: 1px solid var(--line); border-radius: 999px; color: var(--ink); background: transparent; min-height: 52px; padding: 10px 8px; font-weight: 500; font-family: inherit; }
+  .tab-btn.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .app { padding-bottom: 82px; }
+  .hint, .field-label { color: var(--mute); font-weight: 500; }
+  input[type="text"], input[type="number"], input[type="tel"], select { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 10px 16px; color: var(--ink); }
+  input:focus, select:focus { outline: 2px solid var(--ink); outline-offset: 1px; }
+  button { border-radius: 999px; font-family: inherit; font-weight: 500; padding: 10px 18px; }
+  .btn-primary { background: var(--ink); color: var(--bg); }
+  .btn-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  .btn-danger-text { color: var(--ink); text-decoration: underline; }
+  .col-title { font-size: 15px; font-weight: 500; padding-left: 4px; }
+  .scroll-box, .entry-scroll-box { background: transparent; border: 1px solid var(--line); border-radius: 22px; }
+  .entry-table th { background: var(--bg); color: var(--mute); font-weight: 500; border-bottom: 1px solid var(--line); }
+  .entry-table td { border-bottom: 1px solid var(--soft); }
+  .entry-table input { border: 1px solid var(--line); border-radius: 999px; background: transparent; padding: 8px 12px; }
+  .entry-table td.row-num { color: var(--mute); }
+  .entry-table .del-row-btn { color: var(--ink); padding: 4px 8px; }
+  .summary-card { background: transparent; border: 1px solid var(--line); border-radius: 22px; padding: 10px 16px; }
+  .summary-card:active { background: var(--soft); }
+  .summary-card.unmatched { background: transparent; border-style: dashed; }
+  .summary-card .card-name { color: var(--ink); font-weight: 500; }
+  .summary-card .card-account { color: var(--mute); }
+  .summary-card .amt { color: var(--ink); font-weight: 500; }
+  .summary-card .count-badge { background: transparent; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font-weight: 500; padding: 0 10px; }
+  .summary-card .tag-unmatched { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 1px 8px; }
+  .summary-card .phone-link { color: var(--ink); font-weight: 500; }
+  .summary-foot { background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 10px 18px; margin: 0 0 2px; }
+  .summary-foot b { font-weight: 500; }
+  .restore-link { color: var(--ink); }
+  .db-item { background: transparent; border: 1px solid var(--line); border-radius: 18px; padding: 12px 14px; }
+  .db-info .db-name { font-weight: 500; }
+  .db-info .db-note { color: var(--mute); }
+  .form-box { background: transparent; border: 1px solid var(--line); border-radius: 22px; padding: 14px; }
+  .error-msg { color: #B3261E; }
+  .confirm-box { background: var(--bg); border: 1px solid var(--line); border-radius: 26px; }
+  .confirm-msg { color: var(--ink); }
+  .btn-red { background: #EA0000; color: #fff; border: none; }
+  .entry-table tr.dup-row input { background: #F1DFA0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>支票整理工具</h1>
+    <p>輸入帳號與金額，自動比對帳戶、統計張數與總金額</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="entry">登錄與整理</button>
+    <button class="tab-btn" data-tab="db">帳號資料庫</button>
+  </div>
+
+  <div class="panel active" id="panel-entry">
+    <div class="hint" style="margin-bottom:10px;">輸入「帳號」後按 Enter 跳到「金額」，金額按 Enter 會自動換下一行繼續輸入帳號。</div>
+
+    <div class="split-layout">
+      <div class="split-col">
+        <div class="col-title">輸入區（可拖拉右下角調整高度）</div>
+        <div id="dupNote" style="display:none; font-size:13px; color:#8A5A00; padding:0 4px;"></div>
+        <div class="entry-scroll-box">
+          <table class="entry-table">
+            <thead><tr><th style="width:28px;"></th><th>帳號</th><th>金額</th><th style="width:30px;"></th></tr></thead>
+            <tbody id="entryBody"></tbody>
+          </table>
+        </div>
+        <div class="actions-row">
+          <button class="btn-secondary" id="addRowBtn">＋ 新增一行</button>
+          <button class="btn-secondary" id="clearEntriesBtn">清空全部輸入</button>
+        </div>
+      </div>
+
+      <div class="split-col">
+        <div class="col-title" style="display:flex; justify-content:space-between; align-items:center;">
+          <span>統計整理區（點方框可標記為已處理）</span>
+          <button class="restore-link" id="restoreDismissedBtn" style="display:none;">顯示已隱藏（<span id="dismissedCount">0</span>）</button>
+        </div>
+          <div class="summary-foot">
+            <span>共 <b id="summaryAccountCount">0</b> 個帳戶，<b id="summaryTicketCount">0</b> 張</span>
+            <span>總金額 <b id="summaryTotalAmount">0</b></span>
+          </div>
+        <div class="scroll-box">
+          <ul class="summary-list" id="summaryBody"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="panel-db">
+    <div id="dbTopControls">
+    <div class="search-row" style="margin-bottom:8px;">
+      <input type="text" id="dbSearchFilter" placeholder="搜尋姓名、帳號或電話..." />
+    </div>
+
+    <div class="actions-row">
+      <button class="btn-secondary" id="exportBtn">匯出Excel備份</button>
+      <button class="btn-secondary" id="importBtn">匯入Excel備份</button>
+    </div>
+    <input type="file" id="importFile" accept=".xlsx,.xls,.json" style="display:none;" />
+    <button class="btn-primary" id="openAddFormBtn" style="width:100%; margin-top:8px;">＋ 新增帳號資料</button>
+    </div>
+
+    <div id="dbUnregBox" style="display:none; margin-top:8px;">
+      <div style="font-size:13px; font-weight:600; margin-bottom:6px;">輸入區中尚未登錄的帳號（<span id="dbUnregCount">0</span>）<span style="font-weight:400; color:#888; font-size:12px;">點選可帶入帳號</span></div>
+      <div id="dbUnregList" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;"></div>
+    </div>
+
+    <div class="form-box" id="dbForm" style="display:none;">
+      <div class="field-label">帳號 <span id="dbDupMsg" style="color:#D32F2F; font-weight:700; margin-left:6px;"></span></div>
+      <input type="text" id="dbAccount" placeholder="輸入帳號" />
+      <div class="field-label">姓名</div>
+      <input type="text" id="dbName" placeholder="輸入姓名" />
+      <div class="field-label">電話a</div>
+      <input type="tel" id="dbPhoneA" placeholder="例如：0912345678" />
+      <div class="field-label">電話b</div>
+      <input type="tel" id="dbPhoneB" placeholder="例如：049-2345678（選填）" />
+      <div class="actions-row">
+        <button class="btn-primary" id="dbSaveBtn">新增帳號</button>
+        <button class="btn-secondary" id="dbCancelBtn">完成／取消</button>
+      </div>
+      <div class="error-msg" id="dbError">請輸入帳號與姓名。</div>
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:10px 0 6px;">
+      <div style="font-size:13px; font-weight:600;">帳號資料庫（<span id="dbCount">0</span>）</div>
+      <select id="dbSortSelect" style="width:auto; font-size:12px; padding:5px 8px;">
+        <option value="account">依帳號排序</option>
+        <option value="name">依姓名排序</option>
+        <option value="created">依新增順序（最新在上）</option>
+      </select>
+    </div>
+    <div class="entry-scroll-box" id="dbScrollBox" style="height:420px; padding:6px; box-sizing:border-box;">
+      <ul class="db-list" id="dbList"></ul>
+      <div class="empty-state" id="dbEmpty">尚未建立任何帳號資料</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="confirm-overlay" id="confirmOverlay">
+  <div class="confirm-box">
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-actions">
+      <button class="btn-secondary" id="confirmNoBtn">取消</button>
+      <button class="btn-red" id="confirmYesBtn">確定</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+  var DB_KEY = 'checkOrgDB_v1';
+  var ENTRIES_KEY = 'checkOrgEntries_v1';
+
+  var db = [];          // [{id, account, name, phoneA, phoneB}]
+  var entries = [];     // [{id, account, amount}]
+  var nextDbId = 1;
+  var nextEntryId = 1;
+  var editingDbId = null;
+
+  function showConfirm(message, onYes) {
+    var overlay = document.getElementById('confirmOverlay');
+    document.getElementById('confirmMsg').textContent = message;
+    overlay.style.display = 'flex';
+    function close() {
+      overlay.style.display = 'none';
+      document.getElementById('confirmYesBtn').onclick = null;
+      document.getElementById('confirmNoBtn').onclick = null;
+    }
+    document.getElementById('confirmYesBtn').onclick = function() { close(); onYes(); };
+    document.getElementById('confirmNoBtn').onclick = close;
+  }
+
+  function escapeHtml(s) {
+    var div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+  }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-tab') === tab);
+    });
+    document.querySelectorAll('.panel').forEach(function(p) {
+      p.classList.toggle('active', p.id === 'panel-' + tab);
+    });
+  }
+  document.querySelectorAll('.tab-btn').forEach(function(b) {
+    b.addEventListener('click', function() { switchTab(b.getAttribute('data-tab')); });
+  });
+
+  /* ---------------- 資料庫 (帳號/姓名/電話) ---------------- */
+
+  function loadDB() {
+    try {
+      var raw = localStorage.getItem(DB_KEY);
+      if (raw) {
+        db = JSON.parse(raw);
+        var maxId = 0;
+        db.forEach(function(d) { if (d.id > maxId) maxId = d.id; });
+        nextDbId = maxId + 1;
+      }
+    } catch (e) { db = []; }
+  }
+
+  function saveDB() {
+    try {
+      localStorage.setItem(DB_KEY, JSON.stringify(db));
+    } catch (e) {
+      alert('儲存失敗，瀏覽器儲存空間可能已滿或不支援。');
+    }
+  }
+
+  function findAccount(account) {
+    if (!account) return null;
+    var norm = String(account).trim();
+    if (!norm) return null;
+    for (var i = 0; i < db.length; i++) {
+      if (String(db[i].account).trim() === norm) return db[i];
+    }
+    return null;
+  }
+
+  var dbDupAccount = '';
+  function setDup(acct) {
+    dbDupAccount = acct || '';
+    document.getElementById('dbDupMsg').textContent = acct ? '帳號已存在' : '';
+    refreshDbList();
+  }
+  function checkDup() {
+    var a = document.getElementById('dbAccount').value.trim();
+    var f = a ? findAccount(a) : null;
+    if (f && f.id !== editingDbId) { setDup(a); return true; }
+    setDup('');
+    return false;
+  }
+  function refreshDbList() {
+    var list = document.getElementById('dbList');
+    var empty = document.getElementById('dbEmpty');
+    var query = (document.getElementById('dbSearchFilter').value || '').trim().toLowerCase();
+    var filtered = db.filter(function(d) {
+      if (!query) return true;
+      var hay = ((d.account || '') + ' ' + (d.name || '') + ' ' + (d.phoneA || '') + ' ' + (d.phoneB || '')).toLowerCase();
+      return hay.indexOf(query) !== -1;
+    });
+    if (dbDupAccount) {
+      filtered = db.filter(function(d) { return String(d.account).trim() === dbDupAccount; });
+    }
+    var sortMode = document.getElementById('dbSortSelect').value;
+    if (sortMode === 'account') {
+      filtered.sort(function(a, b) { return String(a.account).localeCompare(String(b.account)); });
+    } else if (sortMode === 'name') {
+      filtered.sort(function(a, b) { return String(a.name).localeCompare(String(b.name), 'zh-Hant'); });
+    } else {
+      filtered.sort(function(a, b) { return b.id - a.id; });
+    }
+    document.getElementById('dbCount').textContent = db.length;
+    list.innerHTML = '';
+    empty.style.display = filtered.length === 0 ? 'block' : 'none';
+    filtered.forEach(function(d) {
+      var li = document.createElement('li');
+      li.className = 'db-item';
+      li.innerHTML =
+        '<div class="db-info"><div class="db-name">' + escapeHtml(d.name) + '　<span style="color:#7A7462; font-weight:400; font-size:12px;">' + escapeHtml(d.account) + '</span></div>' +
+        '<div class="db-note">' + escapeHtml([d.phoneA, d.phoneB].filter(Boolean).join('　')) + '</div></div>' +
+        '<button class="btn-secondary" data-edit="' + d.id + '" style="font-size:12px; padding:6px 10px;">⚙️ 編輯</button>' +
+        '<button class="btn-danger-text" data-del="' + d.id + '">刪除</button>';
+      list.appendChild(li);
+    });
+    list.querySelectorAll('[data-edit]').forEach(function(btn) {
+      btn.addEventListener('click', function() { startEditDb(parseInt(btn.getAttribute('data-edit'))); });
+    });
+    list.querySelectorAll('[data-del]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = parseInt(btn.getAttribute('data-del'));
+        showConfirm('確定要刪除這筆帳號資料嗎？', function() {
+          db = db.filter(function(d) { return d.id !== id; });
+          saveDB();
+          refreshDbList();
+          refreshEntryTable();
+          refreshSummary();
+        });
+      });
+    });
+  }
+
+  document.getElementById('dbSearchFilter').addEventListener('input', refreshDbList);
+  document.getElementById('dbSortSelect').addEventListener('change', refreshDbList);
+
+  function refreshUnregList() {
+    var list = document.getElementById('dbUnregList');
+    var map = {}, order = [];
+    entries.forEach(function(e) {
+      var a = String(e.account || '').trim();
+      if (!a || findAccount(a)) return;
+      if (!map[a]) { map[a] = { total: 0, n: 0 }; order.push(a); }
+      map[a].total += parseInt(e.amount || '0', 10) || 0;
+      map[a].n++;
+    });
+    document.getElementById('dbUnregCount').textContent = order.length;
+    if (!order.length) {
+      list.innerHTML = '<div style="font-size:13px; color:#2C7A4B; padding:6px 2px;">✓ 輸入區的帳號都已登錄</div>';
+      return;
+    }
+    list.innerHTML = order.map(function(a) {
+      return '<div class="unreg-item" data-acc="' + escapeHtml(a) + '" style="display:flex; justify-content:space-between; align-items:center; background:transparent; border:1px dashed #B3261E; border-radius:18px; padding:10px 16px; font-size:15px; cursor:pointer;">' +
+        '<span>' + escapeHtml(a) + '</span><span style="font-size:13px; color:#666;">' + map[a].n + ' 張・' + map[a].total.toLocaleString() + '</span></div>';
+    }).join('');
+    Array.prototype.forEach.call(list.querySelectorAll('.unreg-item'), function(el) {
+      el.addEventListener('click', function() {
+        if (editingDbId) return;
+        document.getElementById('dbAccount').value = el.getAttribute('data-acc');
+        document.getElementById('dbName').focus();
+      });
+    });
+  }
+  function showDbForm(isEdit) {
+    document.getElementById('dbTopControls').style.display = 'none';
+    document.getElementById('dbUnregBox').style.display = isEdit ? 'none' : 'block';
+    if (!isEdit) refreshUnregList();
+    document.getElementById('dbForm').style.display = 'flex';
+    window.scrollTo({ top: 0 });
+    document.getElementById('dbSaveBtn').textContent = isEdit ? '儲存修改' : '新增帳號';
+  }
+  function hideDbForm() {
+    setDup('');
+    document.getElementById('dbTopControls').style.display = '';
+    document.getElementById('dbUnregBox').style.display = 'none';
+    document.getElementById('dbForm').style.display = 'none';
+    editingDbId = null;
+    document.getElementById('dbAccount').value = '';
+    document.getElementById('dbName').value = '';
+    document.getElementById('dbPhoneA').value = '';
+    document.getElementById('dbPhoneB').value = '';
+    document.getElementById('dbError').classList.remove('show');
+  }
+
+  document.getElementById('openAddFormBtn').addEventListener('click', function() {
+    editingDbId = null;
+    showDbForm(false);
+  });
+  document.getElementById('dbCancelBtn').addEventListener('click', hideDbForm);
+  document.getElementById('dbAccount').addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!checkDup()) document.getElementById('dbName').focus();
+  });
+  document.getElementById('dbAccount').addEventListener('input', function() {
+    if (dbDupAccount) setDup('');
+  });
+
+  function startEditDb(id) {
+    var d = db.find(function(x) { return x.id === id; });
+    if (!d) return;
+    editingDbId = id;
+    document.getElementById('dbAccount').value = d.account;
+    document.getElementById('dbName').value = d.name;
+    document.getElementById('dbPhoneA').value = d.phoneA || '';
+    document.getElementById('dbPhoneB').value = d.phoneB || '';
+    showDbForm(true);
+  }
+
+  document.getElementById('dbSaveBtn').addEventListener('click', function() {
+    var account = document.getElementById('dbAccount').value.trim();
+    var name = document.getElementById('dbName').value.trim();
+    var phoneA = document.getElementById('dbPhoneA').value.trim();
+    var phoneB = document.getElementById('dbPhoneB').value.trim();
+    var errBox = document.getElementById('dbError');
+    errBox.classList.remove('show');
+    if (checkDup()) return;
+    if (!account || !name) {
+      errBox.textContent = '請輸入帳號與姓名。';
+      errBox.classList.add('show');
+      return;
+    }
+    var wasEdit = !!editingDbId;
+    if (editingDbId) {
+      var d = db.find(function(x) { return x.id === editingDbId; });
+      d.account = account; d.name = name; d.phoneA = phoneA; d.phoneB = phoneB;
+    } else {
+      db.push({ id: nextDbId++, account: account, name: name, phoneA: phoneA, phoneB: phoneB });
+    }
+    saveDB();
+    refreshDbList();
+    refreshEntryTable();
+    refreshSummary();
+    if (wasEdit) {
+      hideDbForm();
+    } else {
+      ['dbAccount','dbName','dbPhoneA','dbPhoneB'].forEach(function(i) { document.getElementById(i).value = ''; });
+      refreshUnregList();
+      document.getElementById('dbAccount').focus();
+    }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', function() {
+    var rows = db.map(function(d) {
+      return { '帳號': d.account || '', '姓名': d.name || '', '電話a': d.phoneA || '', '電話b': d.phoneB || '' };
+    });
+    var ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 16 }];
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '帳號資料庫');
+    XLSX.writeFile(wb, '帳號資料庫備份_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', function() {
+    document.getElementById('importFile').click();
+  });
+
+  function importRows(rows) {
+    var count = 0;
+    rows.forEach(function(row) {
+      var account = String(row['帳號'] || row.account || row.Account || '').trim();
+      var name = String(row['姓名'] || row.name || row.Name || '').trim();
+      var phoneA = String(row['電話a'] || row.phoneA || row.PhoneA || '').trim();
+      var phoneB = String(row['電話b'] || row.phoneB || row.PhoneB || '').trim();
+      if (!account || !name) return;
+      var existing = findAccount(account);
+      if (existing) {
+        existing.name = name;
+        if (phoneA) existing.phoneA = phoneA;
+        if (phoneB) existing.phoneB = phoneB;
+      } else {
+        db.push({ id: nextDbId++, account: account, name: name, phoneA: phoneA, phoneB: phoneB });
+      }
+      count++;
+    });
+    saveDB();
+    refreshDbList();
+    refreshEntryTable();
+    refreshSummary();
+    alert('匯入完成，處理 ' + count + ' 筆資料（已存在的帳號會更新姓名／電話）。');
+  }
+
+  document.getElementById('importFile').addEventListener('change', function(e) {
+    var file = e.target.files[0];
+    if (!file) return;
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (ext === 'json') {
+      var reader = new FileReader();
+      reader.onload = function() {
+        try {
+          var data = JSON.parse(reader.result);
+          if (!Array.isArray(data)) throw new Error('格式錯誤');
+          importRows(data.map(function(d) {
+            return { '帳號': d.account, '姓名': d.name, '電話a': d.phoneA, '電話b': d.phoneB };
+          }));
+        } catch (err) {
+          alert('匯入失敗，檔案格式不正確。');
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      var reader2 = new FileReader();
+      reader2.onload = function() {
+        try {
+          var data = new Uint8Array(reader2.result);
+          var wb = XLSX.read(data, { type: 'array' });
+          var sheet = wb.Sheets[wb.SheetNames[0]];
+          var rows = XLSX.utils.sheet_to_json(sheet);
+          importRows(rows);
+        } catch (err) {
+          alert('匯入失敗，請確認是有效的Excel檔案（.xlsx）。');
+        }
+      };
+      reader2.readAsArrayBuffer(file);
+    }
+    e.target.value = '';
+  });
+
+  /* ---------------- 輸入區（帳號／金額登錄） ---------------- */
+
+  function loadEntries() {
+    try {
+      var raw = localStorage.getItem(ENTRIES_KEY);
+      if (raw) {
+        entries = JSON.parse(raw);
+        var maxId = 0;
+        entries.forEach(function(e) { if (e.id > maxId) maxId = e.id; });
+        nextEntryId = maxId + 1;
+      }
+    } catch (e) { entries = []; }
+    if (entries.length === 0) {
+      entries.push({ id: nextEntryId++, account: '', amount: '' });
+    }
+  }
+
+  function saveEntries() {
+    try {
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+    } catch (e) {}
+  }
+
+  // 金額千分位逗點處理：entry.amount 內部一律存「純數字字串」，輸入框顯示時才加上逗點
+  function formatAmountDigits(digits) {
+    if (!digits) return '';
+    return parseInt(digits, 10).toLocaleString('en-US');
+  }
+  function digitsOnly(str) {
+    return (str || '').replace(/[^\d]/g, '');
+  }
+  function digitsBeforeCursor(value, cursorPos) {
+    return (value.slice(0, cursorPos).match(/\d/g) || []).length;
+  }
+  function cursorPosForDigitCount(formatted, digitCount) {
+    if (digitCount <= 0) return 0;
+    var count = 0;
+    for (var i = 0; i < formatted.length; i++) {
+      if (/\d/.test(formatted[i])) {
+        count++;
+        if (count === digitCount) return i + 1;
+      }
+    }
+    return formatted.length;
+  }
+
+  // 帳號輸入框右邊的綠勾/紅叉：帳號是否能在資料庫裡比對到
+  function matchIndicatorHtml(account) {
+    var acct = String(account || '').trim();
+    if (!acct) return '';
+    return findAccount(acct) ? '<span class="yes">✓</span>' : '<span class="no">✕</span>';
+  }
+
+  function updateMatchIndicator(entryId) {
+    var entry = entries.find(function(e) { return e.id === entryId; });
+    var el = document.getElementById('match-' + entryId);
+    if (entry && el) el.innerHTML = matchIndicatorHtml(entry.account);
+  }
+
+  function refreshEntryTable() {
+    var body = document.getElementById('entryBody');
+    body.innerHTML = '';
+    entries.forEach(function(entry, idx) {
+      var tr = document.createElement('tr');
+      var matchHtml = matchIndicatorHtml(entry.account);
+      tr.innerHTML =
+        '<td class="row-num">' + (idx + 1) + '<span class="match-dot" id="match-' + entry.id + '">' + matchHtml + '</span></td>' +
+        '<td><input type="text" class="acct-input" data-id="' + entry.id + '" value="' + escapeHtml(entry.account) + '" placeholder="帳號" /></td>' +
+        '<td><input type="text" class="amt-input" data-id="' + entry.id + '" value="' + escapeHtml(formatAmountDigits(entry.amount)) + '" placeholder="金額" inputmode="numeric" /></td>' +
+        '<td><button class="del-row-btn" data-id="' + entry.id + '" title="刪除這一行">✕</button></td>';
+      body.appendChild(tr);
+    });
+    wireEntryEvents();
+    markDuplicates();
+  }
+
+  var ACCOUNT_LEN = 7;
+  function markDuplicates() {
+    var rows = document.querySelectorAll('#entryBody tr');
+    var count = {};
+    entries.forEach(function(e) {
+      var a = String(e.account || '').trim();
+      if (!a || !e.amount) return;
+      var k = a + '|' + e.amount;
+      count[k] = (count[k] || 0) + 1;
+    });
+    var groups = 0;
+    Object.keys(count).forEach(function(k) { if (count[k] > 1) groups++; });
+    entries.forEach(function(e, i) {
+      var a = String(e.account || '').trim();
+      var dup = a && e.amount && count[a + '|' + e.amount] > 1;
+      if (rows[i]) rows[i].classList.toggle('dup-row', !!dup);
+    });
+    var note = document.getElementById('dupNote');
+    if (groups) { note.style.display = 'block'; note.textContent = '⚠ 有 ' + groups + ' 組帳號與金額完全相同，請確認是否重複輸入（已標黃）'; }
+    else note.style.display = 'none';
+  }
+
+  function wireEntryEvents() {
+    var body = document.getElementById('entryBody');
+
+    body.querySelectorAll('.acct-input').forEach(function(input) {
+      input.addEventListener('input', function(ev) {
+        var id = parseInt(input.getAttribute('data-id'));
+        var entry = entries.find(function(e) { return e.id === id; });
+        if (entry) entry.account = input.value;
+        updateMatchIndicator(id);
+        saveEntries();
+        refreshSummary();
+        markDuplicates();
+        // 滿七碼且游標在最後：自動跳到金額
+        var v = input.value.trim();
+        if (v.length === ACCOUNT_LEN && input.selectionStart === input.value.length && (!ev || !ev.inputType || ev.inputType.indexOf('insert') === 0)) {
+          var amt = input.closest('tr').querySelector('.amt-input');
+          if (amt) amt.focus();
+        }
+      });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var row = input.closest('tr');
+          var amtInput = row.querySelector('.amt-input');
+          if (amtInput) amtInput.focus();
+        }
+      });
+    });
+
+    body.querySelectorAll('.amt-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var id = parseInt(input.getAttribute('data-id'));
+        var entry = entries.find(function(e) { return e.id === id; });
+        var cursorPos = input.selectionStart;
+        var digitCountBefore = digitsBeforeCursor(input.value, cursorPos);
+        var rawDigits = digitsOnly(input.value);
+        var formatted = formatAmountDigits(rawDigits);
+        input.value = formatted;
+        var newPos = cursorPosForDigitCount(formatted, digitCountBefore);
+        input.setSelectionRange(newPos, newPos);
+        if (entry) entry.amount = rawDigits;
+        saveEntries();
+        refreshSummary();
+        markDuplicates();
+      });
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var id = parseInt(input.getAttribute('data-id'));
+          var idx = entries.findIndex(function(x) { return x.id === id; });
+          if (idx === entries.length - 1) {
+            // 最後一行：新增一行並跳過去
+            entries.push({ id: nextEntryId++, account: '', amount: '' });
+            saveEntries();
+            refreshEntryTable();
+            var newRow = document.getElementById('entryBody').lastElementChild;
+            if (newRow) {
+              var acctInput = newRow.querySelector('.acct-input');
+              if (acctInput) acctInput.focus();
+            }
+          } else {
+            // 不是最後一行：跳到下一行的帳號欄
+            var body2 = document.getElementById('entryBody');
+            var rows = body2.querySelectorAll('tr');
+            var nextRow = rows[idx + 1];
+            if (nextRow) {
+              var nextAcct = nextRow.querySelector('.acct-input');
+              if (nextAcct) nextAcct.focus();
+            }
+          }
+        }
+      });
+    });
+
+    body.querySelectorAll('.del-row-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = parseInt(btn.getAttribute('data-id'));
+        entries = entries.filter(function(e) { return e.id !== id; });
+        if (entries.length === 0) entries.push({ id: nextEntryId++, account: '', amount: '' });
+        saveEntries();
+        refreshEntryTable();
+        refreshSummary();
+      });
+    });
+  }
+
+  document.getElementById('addRowBtn').addEventListener('click', function() {
+    entries.push({ id: nextEntryId++, account: '', amount: '' });
+    saveEntries();
+    refreshEntryTable();
+    var body = document.getElementById('entryBody');
+    var newRow = body.lastElementChild;
+    if (newRow) {
+      var acctInput = newRow.querySelector('.acct-input');
+      if (acctInput) acctInput.focus();
+    }
+  });
+
+  document.getElementById('clearEntriesBtn').addEventListener('click', function() {
+    showConfirm('確定要清空目前輸入區全部的帳號與金額嗎？這個動作無法復原。', function() {
+      entries = [{ id: nextEntryId++, account: '', amount: '' }];
+      dismissedAccounts = {};
+      saveEntries();
+      refreshEntryTable();
+      refreshSummary();
+    });
+  });
+
+  /* ---------------- 統計整理區 ---------------- */
+
+  function formatAmount(n) {
+    return n.toLocaleString('zh-TW');
+  }
+
+  var dismissedAccounts = {}; // account(trim) -> true，點了卡片後標記為已處理、從畫面隱藏
+
+  function refreshSummary() {
+    var groups = {}; // account(trim) -> { account, amount, count }
+    entries.forEach(function(entry) {
+      var acct = String(entry.account || '').trim();
+      if (!acct) return;
+      var amt = parseFloat(entry.amount);
+      if (isNaN(amt)) amt = 0;
+      if (!groups[acct]) groups[acct] = { account: acct, amount: 0, count: 0 };
+      groups[acct].amount += amt;
+      groups[acct].count += 1;
+    });
+
+    var allList = Object.keys(groups).map(function(k) { return groups[k]; });
+    // 依帳號排序，較穩定好對照
+    allList.sort(function(a, b) { return a.account.localeCompare(b.account); });
+
+    // 清掉已經不存在於目前輸入資料裡的隱藏紀錄，避免殘留
+    var validAccountSet = {};
+    allList.forEach(function(g) { validAccountSet[g.account] = true; });
+    Object.keys(dismissedAccounts).forEach(function(acct) {
+      if (!validAccountSet[acct]) delete dismissedAccounts[acct];
+    });
+
+    var visibleList = allList.filter(function(g) { return !dismissedAccounts[g.account]; });
+    var dismissedCount = allList.length - visibleList.length;
+
+    var body = document.getElementById('summaryBody');
+    body.innerHTML = '';
+    var totalAmount = 0;
+    var totalTickets = 0;
+
+    visibleList.forEach(function(g) {
+      var matched = findAccount(g.account);
+      var li = document.createElement('li');
+      li.className = 'summary-card' + (matched ? '' : ' unmatched');
+      li.setAttribute('data-account', g.account);
+      var nameHtml = matched ? escapeHtml(matched.name) : '<span class="tag-unmatched">未登錄</span>';
+      var phoneA = matched && matched.phoneA ? '<a class="phone-link" href="tel:' + escapeHtml(matched.phoneA.replace(/\s+/g, '')) + '">📞' + escapeHtml(matched.phoneA) + '</a>' : '';
+      var phoneB = matched && matched.phoneB ? '<a class="phone-link" href="tel:' + escapeHtml(matched.phoneB.replace(/\s+/g, '')) + '">📞' + escapeHtml(matched.phoneB) + '</a>' : '';
+      li.innerHTML =
+        '<div class="card-row1"><span class="card-name">' + nameHtml + '</span><span class="card-account">' + escapeHtml(g.account) + '</span></div>' +
+        '<div class="card-row2"><span class="amt">$' + formatAmount(g.amount) + '</span><span class="count-badge">' + g.count + '張</span></div>' +
+        (phoneA || phoneB ? '<div class="card-row3">' + phoneA + phoneB + '</div>' : '');
+      li.addEventListener('click', function() {
+        dismissedAccounts[g.account] = true;
+        refreshSummary();
+      });
+      // 電話連結本身要能正常撥號，不要觸發整張卡片的消失動作
+      li.querySelectorAll('.phone-link').forEach(function(a) {
+        a.addEventListener('click', function(e) { e.stopPropagation(); });
+      });
+      body.appendChild(li);
+      totalAmount += g.amount;
+      totalTickets += g.count;
+    });
+
+    document.getElementById('summaryAccountCount').textContent = visibleList.length;
+    document.getElementById('summaryTicketCount').textContent = totalTickets;
+    document.getElementById('summaryTotalAmount').textContent = formatAmount(totalAmount);
+
+    var restoreBtn = document.getElementById('restoreDismissedBtn');
+    document.getElementById('dismissedCount').textContent = dismissedCount;
+    restoreBtn.style.display = dismissedCount > 0 ? 'inline-block' : 'none';
+  }
+
+  document.getElementById('restoreDismissedBtn').addEventListener('click', function() {
+    dismissedAccounts = {};
+    refreshSummary();
+  });
+
+  loadDB();
+  loadEntries();
+  refreshDbList();
+  refreshEntryTable();
+  refreshSummary();
+</script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
+</body>
+</html>
