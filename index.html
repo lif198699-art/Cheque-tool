@@ -146,7 +146,7 @@
   .btn-primary { background: var(--ink); color: var(--bg); }
   .btn-secondary { background: transparent; color: var(--ink); border: 1px solid var(--line); }
   .btn-danger-text { color: var(--ink); text-decoration: underline; }
-  .col-title { font-size: 15px; font-weight: 500; padding-left: 4px; }
+  .col-title { font-size: 15px; font-weight: 500; background: var(--ink); color: var(--bg); padding: 10px 14px; border-radius: 6px; }
   .scroll-box, .entry-scroll-box { background: transparent; border: 1px solid var(--line); border-radius: 22px; }
   .entry-table th { background: var(--bg); color: var(--mute); font-weight: 500; border-bottom: 1px solid var(--line); }
   .entry-table td { border-bottom: 1px solid var(--soft); }
@@ -157,7 +157,7 @@
   .summary-card:active { background: var(--soft); }
   .summary-card.unmatched { background: transparent; border-style: dashed; }
   .summary-card .card-name { color: var(--ink); font-weight: 500; }
-  .summary-card .card-account { color: var(--mute); }
+  .summary-card .card-account { color: var(--ink); font-weight: 500; }
   .summary-card .amt { color: var(--ink); font-weight: 500; }
   .summary-card .count-badge { background: transparent; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); font-weight: 500; padding: 0 10px; }
   .summary-card .tag-unmatched { background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; padding: 1px 8px; }
@@ -173,13 +173,27 @@
   .confirm-box { background: var(--bg); border: 1px solid var(--line); border-radius: 26px; }
   .confirm-msg { color: var(--ink); }
   .btn-red { background: #EA0000; color: #fff; border: none; }
+  #panel-entry .actions-row button { padding: 10px 6px; white-space: nowrap; font-size: 13px; }
+  .name-cell { width: 64px; max-width: 64px; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name-cell .unreg { color: #B3261E; font-size: 12px; }
+  .entry-table input { padding: 8px 8px; min-width: 0; }
+  #hiddenBlock { margin-top: 10px; }
+  #hiddenBlock .summary-card { opacity: .7; border-style: dotted; }
+  /* 統計整理區：卡片右側核取方塊，勾選後整張填色、字反白 */
+  .summary-row { list-style: none; width: 100%; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .summary-row .summary-card { width: auto; flex: 1; min-width: 0; transition: background .15s, color .15s; }
+  .chk { flex-shrink: 0; width: 52px; height: 52px; padding: 0; background: transparent; border: none; display: flex; align-items: center; justify-content: center; }
+  .chk span { width: 30px; height: 30px; border: 1.5px solid var(--line); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: transparent; font-size: 18px; line-height: 1; }
+  .chk[aria-pressed="true"] span { background: #E4DED2; border-color: var(--line); color: var(--ink); }
+  .summary-card.checked { background: #E4DED2; }
+  @media (max-width:720px){ .split-layout { align-items: stretch; } }
   .entry-table tr.dup-row input { background: #F1DFA0; }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
-    <h1>支票整理工具</h1>
+    <h1>支票整理工具 <span style="font-size:14px; color:var(--mute); font-weight:400;">2.0</span></h1>
     <p>輸入帳號與金額，自動比對帳戶、統計張數與總金額</p>
   </header>
 
@@ -193,31 +207,36 @@
 
     <div class="split-layout">
       <div class="split-col">
-        <div class="col-title">輸入區（可拖拉右下角調整高度）</div>
+        <div class="col-title">輸入區 <span style="font-weight:400; font-size:12px; opacity:.85;">可拖拉右下角調整高度</span></div>
         <div id="dupNote" style="display:none; font-size:13px; color:#8A5A00; padding:0 4px;"></div>
-        <div class="entry-scroll-box">
+        <div class="entry-scroll-box" id="entryBox">
           <table class="entry-table">
-            <thead><tr><th style="width:28px;"></th><th>帳號</th><th>金額</th><th style="width:30px;"></th></tr></thead>
+            <thead><tr><th style="width:28px;"></th><th style="width:64px;">姓名</th><th>帳號</th><th>金額</th><th style="width:30px;"></th></tr></thead>
             <tbody id="entryBody"></tbody>
           </table>
         </div>
         <div class="actions-row">
-          <button class="btn-secondary" id="addRowBtn">＋ 新增一行</button>
           <button class="btn-secondary" id="clearEntriesBtn">清空全部輸入</button>
+          <button class="btn-secondary" id="toggleEntryBtn">隱藏輸入區</button>
         </div>
       </div>
 
       <div class="split-col">
-        <div class="col-title" style="display:flex; justify-content:space-between; align-items:center;">
-          <span>統計整理區（點方框可標記為已處理）</span>
-          <button class="restore-link" id="restoreDismissedBtn" style="display:none;">顯示已隱藏（<span id="dismissedCount">0</span>）</button>
-        </div>
+        <div class="col-title">
+          <span>統計整理區 <span style="font-weight:400; font-size:12px; opacity:.85;">點選好後移至「標記區」</span></span>
+                  </div>
           <div class="summary-foot">
             <span>共 <b id="summaryAccountCount">0</b> 個帳戶，<b id="summaryTicketCount">0</b> 張</span>
             <span>總金額 <b id="summaryTotalAmount">0</b></span>
           </div>
         <div class="scroll-box">
           <ul class="summary-list" id="summaryBody"></ul>
+        </div>
+        <div id="hiddenBlock">
+          <div class="col-title" style="margin-bottom:6px; display:block;">標記區（<span id="dismissedCount">0</span>） <span style="font-weight:400; font-size:12px; opacity:.85;">點方框移回統計整理區</span></div>
+          <div class="scroll-box" style="max-height:300px;">
+            <ul class="summary-list" id="hiddenBody"></ul>
+          </div>
         </div>
       </div>
     </div>
@@ -253,7 +272,7 @@
       <input type="tel" id="dbPhoneB" placeholder="例如：049-2345678（選填）" />
       <div class="actions-row">
         <button class="btn-primary" id="dbSaveBtn">新增帳號</button>
-        <button class="btn-secondary" id="dbCancelBtn">完成／取消</button>
+        <button class="btn-secondary" id="dbCancelBtn">關閉該區</button>
       </div>
       <div class="error-msg" id="dbError">請輸入帳號與姓名。</div>
     </div>
@@ -656,7 +675,8 @@
   function matchIndicatorHtml(account) {
     var acct = String(account || '').trim();
     if (!acct) return '';
-    return findAccount(acct) ? '<span class="yes">✓</span>' : '<span class="no">✕</span>';
+    var f = findAccount(acct);
+    return f ? escapeHtml(f.name) : '<span class="unreg">未登錄</span>';
   }
 
   function updateMatchIndicator(entryId) {
@@ -672,7 +692,8 @@
       var tr = document.createElement('tr');
       var matchHtml = matchIndicatorHtml(entry.account);
       tr.innerHTML =
-        '<td class="row-num">' + (idx + 1) + '<span class="match-dot" id="match-' + entry.id + '">' + matchHtml + '</span></td>' +
+        '<td class="row-num">' + (idx + 1) + '</td>' +
+        '<td class="name-cell" id="match-' + entry.id + '">' + matchHtml + '</td>' +
         '<td><input type="text" class="acct-input" data-id="' + entry.id + '" value="' + escapeHtml(entry.account) + '" placeholder="帳號" /></td>' +
         '<td><input type="text" class="amt-input" data-id="' + entry.id + '" value="' + escapeHtml(formatAmountDigits(entry.amount)) + '" placeholder="金額" inputmode="numeric" /></td>' +
         '<td><button class="del-row-btn" data-id="' + entry.id + '" title="刪除這一行">✕</button></td>';
@@ -790,22 +811,19 @@
     });
   }
 
-  document.getElementById('addRowBtn').addEventListener('click', function() {
-    entries.push({ id: nextEntryId++, account: '', amount: '' });
-    saveEntries();
-    refreshEntryTable();
-    var body = document.getElementById('entryBody');
-    var newRow = body.lastElementChild;
-    if (newRow) {
-      var acctInput = newRow.querySelector('.acct-input');
-      if (acctInput) acctInput.focus();
-    }
+  document.getElementById('toggleEntryBtn').addEventListener('click', function() {
+    var box = document.getElementById('entryBox');
+    var hide = box.style.display !== 'none';
+    box.style.display = hide ? 'none' : '';
+    if (hide) document.getElementById('dupNote').style.display = 'none'; else markDuplicates();
+    this.textContent = hide ? '顯示輸入區' : '隱藏輸入區';
   });
 
   document.getElementById('clearEntriesBtn').addEventListener('click', function() {
     showConfirm('確定要清空目前輸入區全部的帳號與金額嗎？這個動作無法復原。', function() {
       entries = [{ id: nextEntryId++, account: '', amount: '' }];
       dismissedAccounts = {};
+      checkedAccounts = {};
       saveEntries();
       refreshEntryTable();
       refreshSummary();
@@ -818,6 +836,7 @@
     return n.toLocaleString('zh-TW');
   }
 
+  var checkedAccounts = {}; // account -> true，核取方塊勾選後整張卡片填色
   var dismissedAccounts = {}; // account(trim) -> true，點了卡片後標記為已處理、從畫面隱藏
 
   function refreshSummary() {
@@ -851,44 +870,64 @@
     var totalAmount = 0;
     var totalTickets = 0;
 
-    visibleList.forEach(function(g) {
+    function makeCard(g, toHidden) {
       var matched = findAccount(g.account);
       var li = document.createElement('li');
       li.className = 'summary-card' + (matched ? '' : ' unmatched');
       li.setAttribute('data-account', g.account);
       var nameHtml = matched ? escapeHtml(matched.name) : '<span class="tag-unmatched">未登錄</span>';
-      var phoneA = matched && matched.phoneA ? '<a class="phone-link" href="tel:' + escapeHtml(matched.phoneA.replace(/\s+/g, '')) + '">📞' + escapeHtml(matched.phoneA) + '</a>' : '';
-      var phoneB = matched && matched.phoneB ? '<a class="phone-link" href="tel:' + escapeHtml(matched.phoneB.replace(/\s+/g, '')) + '">📞' + escapeHtml(matched.phoneB) + '</a>' : '';
+      var phoneA = matched && matched.phoneA ? '<span class="phone-link">' + escapeHtml(matched.phoneA) + '</span>' : '';
+      var phoneB = matched && matched.phoneB ? '<span class="phone-link">' + escapeHtml(matched.phoneB) + '</span>' : '';
       li.innerHTML =
         '<div class="card-row1"><span class="card-name">' + nameHtml + '</span><span class="card-account">' + escapeHtml(g.account) + '</span></div>' +
         '<div class="card-row2"><span class="amt">$' + formatAmount(g.amount) + '</span><span class="count-badge">' + g.count + '張</span></div>' +
         (phoneA || phoneB ? '<div class="card-row3">' + phoneA + phoneB + '</div>' : '');
       li.addEventListener('click', function() {
-        dismissedAccounts[g.account] = true;
+        if (toHidden) dismissedAccounts[g.account] = true; else delete dismissedAccounts[g.account];
         refreshSummary();
       });
-      // 電話連結本身要能正常撥號，不要觸發整張卡片的消失動作
-      li.querySelectorAll('.phone-link').forEach(function(a) {
-        a.addEventListener('click', function(e) { e.stopPropagation(); });
-      });
-      body.appendChild(li);
+      if (toHidden) {
+        var row = document.createElement('li');
+        row.className = 'summary-row';
+        var on = !!checkedAccounts[g.account];
+        li.classList.toggle('checked', on);
+        var chk = document.createElement('button');
+        chk.className = 'chk';
+        chk.setAttribute('aria-pressed', on ? 'true' : 'false');
+        chk.setAttribute('aria-label', '核取');
+        chk.innerHTML = '<span>✓</span>';
+        chk.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (checkedAccounts[g.account]) delete checkedAccounts[g.account]; else checkedAccounts[g.account] = true;
+          var now = !!checkedAccounts[g.account];
+          chk.setAttribute('aria-pressed', now ? 'true' : 'false');
+          li.classList.toggle('checked', now);
+        });
+        row.appendChild(li);
+        row.appendChild(chk);
+        return row;
+      }
+      return li;
+    }
+
+    visibleList.forEach(function(g) {
+      body.appendChild(makeCard(g, true));
       totalAmount += g.amount;
       totalTickets += g.count;
     });
 
+    var hbody = document.getElementById('hiddenBody');
+    hbody.innerHTML = '';
+    allList.filter(function(g) { return dismissedAccounts[g.account]; }).forEach(function(g) {
+      hbody.appendChild(makeCard(g, false));
+    });
+    if (!dismissedCount) hbody.innerHTML = '<li class="empty-state" style="width:100%;">目前沒有標記的帳號</li>';
+
     document.getElementById('summaryAccountCount').textContent = visibleList.length;
     document.getElementById('summaryTicketCount').textContent = totalTickets;
     document.getElementById('summaryTotalAmount').textContent = formatAmount(totalAmount);
-
-    var restoreBtn = document.getElementById('restoreDismissedBtn');
     document.getElementById('dismissedCount').textContent = dismissedCount;
-    restoreBtn.style.display = dismissedCount > 0 ? 'inline-block' : 'none';
   }
-
-  document.getElementById('restoreDismissedBtn').addEventListener('click', function() {
-    dismissedAccounts = {};
-    refreshSummary();
-  });
 
   loadDB();
   loadEntries();
